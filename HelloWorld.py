@@ -71,12 +71,14 @@ def test_word():
 
 
 def fast_test_pdf():
-    f_read = open('C:\\Users\\user\\Desktop\\新建文本文档.txt', 'r')
-    model = word2vec.Word2Vec(f_read, min_count=5, size=100, iter=5)
+    f_read = ''
+    with open('C:\\Users\\user\\Desktop\\新建文本文档.txt', 'r') as file_to_read:
+        f_read = file_to_read.read()
+    model = word2vec.Word2Vec(f_read, min_count=5, size=100, iter=5, workers=4)
     # model.wv.vocab = {u'收益', 10}
     # model.wv.vectors = [[]]
     # model.train(f_read, total_examples=1, epochs=2, word_count=len(f_read))
-    sim = model.wv.most_similar(u'收', topn=100)
+    sim = model.wv.most_similar(u'收', topn=10)
     for key in sim:
         print(key[0], key[1])
     return
