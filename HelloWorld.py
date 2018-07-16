@@ -10,7 +10,6 @@ from win32com.client import Dispatch
 import re
 from aip import AipOcr
 import os
-import json
 
 jieba.suggest_freq(u'投资收益率', True)
 jieba.suggest_freq(u'投资计划收益', True)
@@ -85,9 +84,6 @@ def fast_test_pdf():
         sentences.append(line.split(' '))
 
     model = word2vec.Word2Vec(sentences, min_count=5, size=100, iter=2, workers=4)
-    # model.wv.vocab = {u'收益', 10}
-    # model.wv.vectors = [[]]
-    # model.train(f_read, total_examples=1, epochs=2, word_count=len(f_read))
     sim = model.wv.most_similar(u'投资收益', topn=10)
     for key in sim:
         print(key[0], key[1])
@@ -122,8 +118,8 @@ def baidu_orc():
     img.save(str(i) + '.png')
     image = get_file_content(str(i) + '.png')
     res = client.basicGeneral(image, options)
-    analysis_json(res)
-    delete_file_content(str(i) + '.png')
+    analysis_json(res)  #处理百度返回的json对象
+    delete_file(str(i) + '.png')
 
     return
 
@@ -133,7 +129,7 @@ def get_file_content(file_path):
         return fp.read()
 
 
-def delete_file_content(file_path):
+def delete_file(file_path):
     os.remove(file_path)
     return
 
