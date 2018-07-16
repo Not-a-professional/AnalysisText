@@ -1,13 +1,16 @@
 #!/usr/bin/python
-# coding: UTF-8
+# -*- coding: utf-8 -*-
 import jieba.analyse
 import jieba
-import pytesseract
 from PIL import Image
 import fitz
 from gensim.models import word2vec
 import win32com
 from win32com.client import Dispatch
+import re
+from aip import AipOcr
+import os
+import json
 
 jieba.suggest_freq(u'投资收益率', True)
 jieba.suggest_freq(u'投资计划收益', True)
@@ -24,40 +27,42 @@ jieba.suggest_freq(u'最低', True)
 
 def test_jieba(txt):
     # txt = u'欧阳建国是创新办主任也是欢聚时代公司云计算方面的专家'
-    return u' '.join(jieba.cut(txt))
+    return ' '.join(jieba.cut(txt))
 
 
-def test_pdf():
-    read_pdf = 'C:\\Users\\user\\Documents\\WXWork\\1688851382425401\\Cache\\File\\2018-07\\4-昆明轨交-受托合同-浦发.pdf'
-    doc = fitz.open(read_pdf)
-    page_count = doc.pageCount
-    print(page_count)
-
-    target = ''
-
-    for i in range(page_count):
-        pytesseract.pytesseract.tesseract_cmd = 'D:\\Tesseract-OCR\\tesseract.exe'
-        page = doc[i]
-        zoom = int(300)
-        rotate = int(0)
-        trans = fitz.Matrix(zoom / 100.0, zoom / 100.0).preRotate(rotate)
-        pm = page.getPixmap(matrix=trans, alpha=False)
-        img = Image.frombuffer('RGB', [pm.width, pm.height], pm.samples,
-                               "raw", 'RGB', 0, 1)
-        text = pytesseract.image_to_string(img, lang='chi_sim')
-
-        sentences = test_jieba(text.replace(' ', '').replace('\n', ''))
-
-        target += sentences
-
-    model = word2vec.Word2Vec(size=100, iter=1, workers=4)
-    model.build_vocab()
-    model.train(target)
-    sim = model.wv.most_similar(u'收益', topn=100)
-    for key in sim:
-        print(key[0], key[1])
-
-    return
+# def test_pdf():
+#     read_pdf = 'C:\\Users\\user\\Documents\\WXWork\\1688851382425401\\Cache\\File\\2018-07\\哈尔滨不动产-工银安盛受托合同.pdf'
+#     doc = fitz.open(read_pdf)
+#     page_count = doc.pageCount
+#     print(page_count)
+#
+#     target = ''
+#
+#     for i in range(page_count):
+#         pytesseract.pytesseract.tesseract_cmd = 'D:\\Tesseract-OCR\\tesseract.exe'
+#         page = doc[i]
+#         zoom = int(300)
+#         rotate = int(0)
+#         trans = fitz.Matrix(zoom / 100.0, zoom / 100.0).preRotate(rotate)
+#         pm = page.getPixmap(matrix=trans, alpha=False)
+#         img = Image.frombuffer('RGB', [pm.width, pm.height], pm.samples,
+#                                "raw", 'RGB', 0, 1)
+#         text = pytesseract.image_to_string(img, lang='chi_sim')
+#
+#         target = target + text
+#
+#     target_list = re.split('[。]', test_jieba(target.replace(' ', '').replace('\n', '')))
+#     sentences = []
+#     for line in target_list:
+#         sentences.append(line.split(' '))
+#
+#     model = word2vec.Word2Vec(sentences, min_count=1, window=100, size=100)
+#
+#     sim = model.wv.most_similar(u'投资收益率', topn=10)
+#     for key in sim:
+#         print(key[0], key[1])
+#
+#     return
 
 
 def test_word():
@@ -71,18 +76,75 @@ def test_word():
 
 
 def fast_test_pdf():
-    f_read = ''
     with open('C:\\Users\\user\\Desktop\\新建文本文档.txt', 'r') as file_to_read:
         f_read = file_to_read.read()
-    model = word2vec.Word2Vec(f_read, min_count=5, size=100, iter=5, workers=4)
+
+    target_list = re.split(r'[。]', f_read)
+    sentences = []
+    for line in target_list:
+        sentences.append(line.split(' '))
+
+    model = word2vec.Word2Vec(sentences, min_count=5, size=100, iter=2, workers=4)
     # model.wv.vocab = {u'收益', 10}
     # model.wv.vectors = [[]]
     # model.train(f_read, total_examples=1, epochs=2, word_count=len(f_read))
-    sim = model.wv.most_similar(u'收', topn=10)
+    sim = model.wv.most_similar(u'投资收益', topn=10)
     for key in sim:
         print(key[0], key[1])
     return
 
 
+def baidu_orc():
+    APP_ID = '11540842'
+    API_KEY = 'aaDIvgPK6Ptb0itaS2mlUnOC'
+    SECRET_KEY = 'iVoaZjKu69c11WIsQWKzj2bdiTy7i0Db'
+
+    client = AipOcr(APP_ID, API_KEY, SECRET_KEY)
+
+    options = {}
+    options["language_type"] = "CHN_ENG"
+    options["detect_direction"] = "true"
+    options["detect_language"] = "true"
+    options["probability"] = 'true'
+
+    read_pdf = 'C:\\Users\\user\\Documents\\WXWork\\1688851382425401\\Cache\\File\\2018-07\\2-受托合同（工银安盛）.pdf'
+    doc = fitz.open(read_pdf)
+    page_count = doc.pageCount
+
+    i = 12
+    page = doc[i]
+    zoom = int(320)
+    rotate = int(0)
+    trans = fitz.Matrix(zoom / 100.0, zoom / 100.0).preRotate(rotate)
+    pm = page.getPixmap(matrix=trans, alpha=False)
+    img = Image.frombuffer('RGB', [pm.width, pm.height], pm.samples, "raw", 'RGB', 0, 1)
+
+    img.save(str(i) + '.png')
+    image = get_file_content(str(i) + '.png')
+    res = client.basicGeneral(image, options)
+    analysis_json(res)
+    delete_file_content(str(i) + '.png')
+
+    return
+
+
+def get_file_content(file_path):
+    with open(file_path, 'rb') as fp:
+        return fp.read()
+
+
+def delete_file_content(file_path):
+    os.remove(file_path)
+    return
+
+
+def analysis_json(json_str):
+    for i in range(json_str['words_result_num']):
+        print(json_str['words_result'][i]['words'])
+    return
+
+
 if __name__ == '__main__':
-    fast_test_pdf()
+    #j = '{"log_id": 2471272194,"words_result_num": 2,"words_result":[{"words": " TSINGTAO"},{"words": "青島睥酒"}]}'
+    # analysis_json(json.loads(j))
+    baidu_orc()
